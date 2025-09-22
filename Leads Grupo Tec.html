@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Leads en Tiempo Real</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; } /* gray-800 */
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; } /* gray-600 */
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* gray-500 */
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .list-container { height: 400px; } /* Altura fija para la lista */
+        .line-chart-container { height: 400px; } /* Altura fija para la gráfica de línea */
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Encabezado -->
+        <header class="mb-8 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-teal-400">Dashboard de Leads en Tiempo Real</h1>
+                <p class="text-gray-400 mt-1">Análisis de la adquisición y estado de los leads.</p>
+            </div>
+            <div id="auth-status" class="text-right">
+                 <p class="text-sm text-gray-500">Conectando a la base de datos...</p>
+            </div>
+        </header>
+
+        <!-- Contenedor de Filtros -->
+        <div class="bg-gray-800/50 rounded-2xl p-4 mb-8">
+            <!-- Filtros por Marca -->
+            <div class="mb-6 flex flex-wrap items-center justify-start gap-4">
+                <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Marca:</span>
+                <button data-brand="Todas" class="brand-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105">
+                    <span>Todas</span>
+                </button>
+                <button data-brand="BYD" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                     <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=BYD" alt="BYD" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                    <span>BYD</span>
+                </button>
+                <button data-brand="Honda" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                     <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=H" alt="Honda" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                    <span>Honda</span>
+                </button>
+                <button data-brand="Denza" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                     <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=DZ" alt="Denza" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                    <span>Denza</span>
+                </button>
+            </div>
+
+            <!-- Filtros por Sucursal y Mes -->
+            <div class="flex flex-wrap items-center justify-start gap-x-8 gap-y-4">
+                <!-- Filtros por Sucursal (Contenedor Dinámico) -->
+                <div class="flex flex-wrap items-center justify-start gap-4">
+                    <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Sucursal:</span>
+                    <div id="branch-filters-container" class="flex flex-wrap items-center justify-center sm:justify-start gap-4">
+                        <!-- Los botones de sucursal se generarán aquí dinámicamente -->
+                    </div>
+                </div>
+                <!-- Filtro por Mes -->
+                <div class="flex flex-wrap items-center justify-start gap-4">
+                     <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Mes:</span>
+                    <select id="month-filter" class="bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <!-- Opciones de mes se generarán aquí -->
+                    </select>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Contenedor Principal -->
+        <main>
+            <!-- KPIs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300">Total de Leads</h2>
+                    <p id="totalLeads" class="text-5xl font-bold text-white mt-2">0</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300">Leads de Hoy</h2>
+                    <p id="leadsHoy" class="text-5xl font-bold text-white mt-2">0</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300">Leads Contactados</h2>
+                    <p id="leadsContactados" class="text-5xl font-bold text-white mt-2">0</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-lg font-semibold text-gray-300">Leads Sin Contactar</h2>
+                    <p id="leadsSinContactar" class="text-5xl font-bold text-red-500 mt-2">0</p>
+                </div>
+            </div>
+            
+            <!-- Sección de Gráficas de Dona -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Gráfica: Leads por Origen -->
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-300 mb-4">Leads por Origen</h2>
+                    <div class="chart-container"><canvas id="leadsPorFuenteChart"></canvas></div>
+                </div>
+
+                <!-- Gráfica: Leads por Estatus -->
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-300 mb-4">Leads por Estatus</h2>
+                    <div class="chart-container"><canvas id="leadsPorEstatusChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Sección de Gráfica de Línea y Lista de Leads -->
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <!-- Gráfica: Nuevos Leads por Día -->
+                <div class="lg:col-span-3 bg-gray-800 p-6 rounded-2xl shadow-lg">
+                    <h2 class="text-xl font-semibold text-gray-300 mb-4">Nuevos Leads por Día</h2>
+                    <div class="line-chart-container"><canvas id="leadsPorDiaChart"></canvas></div>
+                </div>
+
+                <!-- Lista: Últimos Leads Registrados -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
+                    <h2 class="text-xl font-semibold text-gray-300 mb-4">Últimos Leads Registrados</h2>
+                    <div id="ultimosLeads" class="flex-grow overflow-y-auto custom-scrollbar pr-2 list-container">
+                        <p class="text-gray-500">Cargando leads...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // Importar funciones de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, getDocs, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuración de Firebase (proporcionada por el entorno) ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Definiciones y Variables Globales ---
+        let db, auth, userId;
+        let allLeads = [];
+        let activeBranch = 'Todas';
+        let activeBrand = 'Todas';
+        let activeMonth = 'Todos';
+        let leadsPorDiaChart, leadsPorFuenteChart, leadsPorEstatusChart;
+
+        const defaultBranches = ["Valle Oriente", "Semi Nuevo", "Poniente", "Tecnológico"];
+        const bydBranches = ["Cumbres", "Gonzalitos", "Sendero", "Santa Catarina", "Piedras Negras"];
+        const denzaBranches = ["Calzada"];
+        const branchDisplayNames = {
+            "Valle Oriente": "Valle O.", "Semi Nuevo": "Semi Nuevo", "Poniente": "Poniente", "Tecnológico": "Tecnológico",
+            "Cumbres": "Cumbres", "Gonzalitos": "Gonzalitos", "Sendero": "Sendero", "Santa Catarina": "Sta. Catarina", "Piedras Negras": "P. Negras",
+            "Calzada": "Calzada"
+        };
+        
+        // --- Funciones ---
+        function reformatDate(dateStr) {
+            const parts = dateStr.split(' ')[0].split('/');
+            if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]} ${dateStr.split(' ')[1]}`;
+            return dateStr;
+        }
+
+        async function addSampleData(leadsCollection) {
+            const sampleData = [
+                // Enero 2025
+                { fecha_alta: "04/01/2025 15:17", agencia: "Poniente", nombre: "Milagros Suarez", marca: "Honda", producto: "Sin Validar C.Clinic", fuente: "3.META/Integraciones", origen: "Nuevo Lead de Facebook", estatus: "Contactado" },
+                { fecha_alta: "04/01/2025 13:02", agencia: "Tecnológico", nombre: "Jorge Galaviz", marca: "Honda", producto: "CITY 2025", fuente: "3.META/Integraciones", origen: "WEBSITE", estatus: "Finalizado" },
+                { fecha_alta: "05/01/2025 10:00", agencia: "Valle Oriente", nombre: "Ana Lopez", marca: "Honda", producto: "HR-V", fuente: "Planta", origen: "Honda Pagina", estatus: "Asignado" },
+                // Febrero 2025
+                { fecha_alta: "10/02/2025 18:00", agencia: "Calzada", nombre: "Cliente Denza 2", marca: "Denza", producto: "D9", fuente: "Planta", origen: "Denza Pagina", estatus: "Contactado" },
+                { fecha_alta: "12/02/2025 09:30", agencia: "Cumbres", nombre: "Cliente BYD 5", marca: "BYD", producto: "Dolphin", fuente: "Planta", origen: "BYD Pagina", estatus: "NO CONTACTADO" },
+                // Septiembre 2025
+                { fecha_alta: "16/09/2025 23:14", agencia: "Valle Oriente", nombre: "Armando Diaz Cela", marca: "Honda", producto: "civic", fuente: "3.META/Integraciones", origen: "Nuevo Lead de Facebook", estatus: "Asignado" },
+                { fecha_alta: "16/09/2025 22:51", agencia: "Valle Oriente", nombre: "Oscar A. Luis M", marca: "Honda", producto: "Sin Validar C.Clinic", fuente: "3.META/Integraciones", origen: "Nuevo Lead de Facebook", estatus: "Contactado" },
+                { fecha_alta: "17/09/2025 10:00", agencia: "Cumbres", nombre: "Cliente BYD 1", marca: "BYD", producto: "Dolphin", fuente: "Planta", origen: "BYD Pagina", estatus: "Asignado" },
+                { fecha_alta: "17/09/2025 11:30", agencia: "Gonzalitos", nombre: "Cliente BYD 2", marca: "BYD", producto: "Seal", fuente: "3.META/Integraciones", origen: "Nuevo Lead de Facebook", estatus: "Contactado" },
+                { fecha_alta: "18/09/2025 14:00", agencia: "Sendero", nombre: "Cliente BYD 3", marca: "BYD", producto: "Yuan", fuente: "Planta", origen: "BYD Pagina", estatus: "NO CONTACTADO" },
+                { fecha_alta: "19/09/2025 12:00", agencia: "Calzada", nombre: "Cliente Denza 1", marca: "Denza", producto: "D9", fuente: "Planta", origen: "Denza Pagina", estatus: "Asignado" }
+            ];
+            for (const lead of sampleData) {
+                const formattedDate = reformatDate(lead.fecha_alta);
+                await addDoc(leadsCollection, { ...lead, fecha_alta: formattedDate, createdAt: Timestamp.fromDate(new Date(formattedDate)) });
+            }
+        }
+
+        function applyFiltersAndRender() {
+            let filteredLeads = allLeads;
+            if (activeBrand !== 'Todas') filteredLeads = filteredLeads.filter(lead => lead.marca === activeBrand);
+            if (activeBranch !== 'Todas') filteredLeads = filteredLeads.filter(lead => lead.agencia === activeBranch);
+            if (activeMonth !== 'Todos') {
+                const [year, monthIndex] = activeMonth.split('-');
+                filteredLeads = filteredLeads.filter(lead => {
+                    const date = new Date(lead.fecha_alta);
+                    return date.getFullYear() == year && date.getMonth() == monthIndex;
+                });
+            }
+            renderDashboard(filteredLeads);
+        }
+        
+        function renderDashboard(leads) {
+            // KPIs
+            document.getElementById('totalLeads').textContent = leads.length;
+            const hoyStr = new Date().toISOString().slice(0, 10);
+            document.getElementById('leadsHoy').textContent = leads.filter(l => l.fecha_alta.startsWith(hoyStr)).length;
+            const contactados = leads.filter(l => l.estatus.toLowerCase().includes('contactado') || l.estatus.toLowerCase().includes('finalizado')).length;
+            document.getElementById('leadsContactados').textContent = contactados;
+            document.getElementById('leadsSinContactar').textContent = leads.filter(l => l.estatus.toLowerCase().includes('no contactado') || l.estatus.toLowerCase().includes('asignado')).length;
+
+            // Últimos leads
+            const ultimosLeadsContainer = document.getElementById('ultimosLeads');
+            let html = '<div class="space-y-4">';
+            leads.sort((a, b) => new Date(b.fecha_alta) - new Date(a.fecha_alta)).slice(0, 20).forEach(lead => {
+                const fecha = new Date(lead.fecha_alta);
+                html += `
+                    <div class="p-3 bg-gray-700/50 rounded-lg border-l-4 border-teal-500">
+                        <p class="font-semibold text-white">${lead.nombre}</p>
+                        <p class="text-sm text-gray-300">${lead.agencia} - ${lead.marca}</p>
+                        <p class="text-xs text-gray-400 mt-1">${fecha.toLocaleString('es-MX')}</p>
+                    </div>`;
+            });
+            html += '</div>';
+            ultimosLeadsContainer.innerHTML = html;
+            
+            // Gráfica de Línea (Leads por Día)
+            const leadsPorDia = leads.reduce((acc, lead) => {
+                const fecha = lead.fecha_alta.split(' ')[0];
+                acc[fecha] = (acc[fecha] || 0) + 1;
+                return acc;
+            }, {});
+            const sortedDates = Object.keys(leadsPorDia).sort((a, b) => new Date(a) - new Date(b));
+            const ctxDia = document.getElementById('leadsPorDiaChart').getContext('2d');
+            if (leadsPorDiaChart) leadsPorDiaChart.destroy();
+            leadsPorDiaChart = new Chart(ctxDia, { type: 'line', data: { labels: sortedDates, datasets: [{ label: 'Nuevos Leads', data: sortedDates.map(d => leadsPorDia[d]), fill: true, borderColor: '#2dd4bf', backgroundColor: 'rgba(45, 212, 191, 0.2)', tension: 0.3, pointBackgroundColor: '#2dd4bf' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#374151' } }, x: { grid: { color: '#374151' } } }, plugins: { legend: { display: false } } } });
+
+            // Gráfica de Dona (Leads por Origen)
+            const origenCount = leads.reduce((acc, lead) => {
+                let origenSimple = lead.origen || 'Desconocido';
+                const origenLowerCase = origenSimple.toLowerCase();
+                if (origenLowerCase.includes('facebook')) origenSimple = 'Facebook';
+                else if (origenLowerCase.includes('instagram')) origenSimple = 'Instagram';
+                else if (origenLowerCase.includes('website')) origenSimple = 'Website';
+                else if (origenLowerCase.includes('pagina')) origenSimple = 'Página Web';
+                acc[origenSimple] = (acc[origenSimple] || 0) + 1;
+                return acc;
+            }, {});
+            const ctxFuente = document.getElementById('leadsPorFuenteChart').getContext('2d');
+            if (leadsPorFuenteChart) leadsPorFuenteChart.destroy();
+            leadsPorFuenteChart = new Chart(ctxFuente, { type: 'doughnut', data: { labels: Object.keys(origenCount), datasets: [{ data: Object.values(origenCount), backgroundColor: ['#2dd4bf', '#f87171', '#fbbf24', '#60a5fa', '#a855f7', '#ec4899'], borderColor: '#1f2937', borderWidth: 4, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, color: '#9ca3af' } } } } });
+
+            // Gráfica de Dona (Leads por Estatus)
+            const estatusCount = leads.reduce((acc, lead) => {
+                let s = lead.estatus.toLowerCase(), cat;
+                if (s.includes('finalizado')) cat = 'Ventas'; else if (s.includes('no contactado')) cat = 'No Contactado'; else if (s.includes('contactado')) cat = 'Contactado'; else if (s.includes('asignado')) cat = 'Asignado'; else cat = 'Otro';
+                acc[cat] = (acc[cat] || 0) + 1;
+                return acc;
+            }, {});
+            const ctxEstatus = document.getElementById('leadsPorEstatusChart').getContext('2d');
+            if (leadsPorEstatusChart) leadsPorEstatusChart.destroy();
+            leadsPorEstatusChart = new Chart(ctxEstatus, { type: 'doughnut', data: { labels: Object.keys(estatusCount), datasets: [{ data: Object.values(estatusCount), backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#6b7280'], borderColor: '#1f2937', borderWidth: 4, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, color: '#9ca3af' } } } } });
+        }
+
+        function setupBranchFilters() {
+            const filterButtons = document.querySelectorAll('.branch-filter-btn');
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeBranch = btn.dataset.branch;
+                    filterButtons.forEach(b => b.classList.replace('bg-teal-500', 'bg-gray-700') || b.classList.replace('text-white', 'text-gray-300'));
+                    btn.classList.replace('bg-gray-700', 'bg-teal-500');
+                    btn.classList.replace('text-gray-300', 'text-white');
+                    applyFiltersAndRender();
+                });
+            });
+        }
+
+        function renderBranchFilters(selectedBrand) {
+            const container = document.getElementById('branch-filters-container');
+            container.innerHTML = '';
+            let branches;
+            if (selectedBrand === 'BYD') branches = bydBranches;
+            else if (selectedBrand === 'Denza') branches = denzaBranches;
+            else branches = defaultBranches;
+            
+            if (selectedBrand !== 'Denza') {
+                container.insertAdjacentHTML('beforeend', `<button data-branch="Todas" class="branch-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105"><span>Todas</span></button>`);
+            }
+            
+            branches.forEach(branch => {
+                const displayName = branchDisplayNames[branch] || branch;
+                const placeholderText = branch.substring(0, 2).toUpperCase();
+                const initialClass = (selectedBrand === 'Denza') ? 'bg-teal-500 text-white' : 'bg-gray-700 text-gray-300';
+                container.insertAdjacentHTML('beforeend', `
+                    <button data-branch="${branch}" class="branch-filter-btn ${initialClass} p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                        <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=${placeholderText}" alt="${branch}" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                        <span>${displayName}</span>
+                    </button>`);
+            });
+            setupBranchFilters();
+        }
+
+        function setupBrandFilters() {
+            const filterButtons = document.querySelectorAll('.brand-filter-btn');
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeBrand = btn.dataset.brand;
+                    filterButtons.forEach(b => b.classList.replace('bg-teal-500', 'bg-gray-700') || b.classList.replace('text-white', 'text-gray-300'));
+                    btn.classList.replace('bg-gray-700', 'bg-teal-500');
+                    btn.classList.replace('text-gray-300', 'text-white');
+                    renderBranchFilters(activeBrand);
+                    activeBranch = (activeBrand === 'Denza') ? 'Calzada' : 'Todas';
+                    applyFiltersAndRender();
+                });
+            });
+        }
+        
+        function populateMonthFilter(leads) {
+            const monthFilter = document.getElementById('month-filter');
+            if (!monthFilter) return;
+            const uniqueMonths = [...new Set(leads.map(lead => {
+                const date = new Date(lead.fecha_alta);
+                return `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`; // YYYY-MM (0-indexed)
+            }))].sort((a, b) => b.localeCompare(a)); // Sort descending
+
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            monthFilter.innerHTML = '<option value="Todos">Todos los Meses</option>';
+            uniqueMonths.forEach(monthKey => {
+                const [year, monthIndex] = monthKey.split('-');
+                const option = document.createElement('option');
+                option.value = monthKey;
+                option.textContent = `${monthNames[parseInt(monthIndex)]} ${year}`;
+                monthFilter.appendChild(option);
+            });
+        }
+        
+        function setupMonthFilter() {
+            const monthFilter = document.getElementById('month-filter');
+            monthFilter.addEventListener('change', (e) => {
+                activeMonth = e.target.value;
+                applyFiltersAndRender();
+            });
+        }
+
+        // --- Inicialización ---
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                onAuthStateChanged(auth, async (user) => {
+                    const authStatusEl = document.getElementById('auth-status');
+                    if (user) {
+                        userId = user.uid;
+                        authStatusEl.innerHTML = `<p class="text-sm text-green-400">Conectado</p><p class="text-xs text-gray-500">ID: ${userId.substring(0,8)}...</p>`;
+                        const leadsCollection = collection(db, `/artifacts/${appId}/public/data/leads`);
+                        const initialSnapshot = await getDocs(leadsCollection);
+                        if (initialSnapshot.empty) {
+                            await addSampleData(leadsCollection);
+                        }
+                        onSnapshot(leadsCollection, (snapshot) => {
+                            allLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            populateMonthFilter(allLeads);
+                            applyFiltersAndRender();
+                        });
+                    } else {
+                        authStatusEl.innerHTML = `<p class="text-sm text-yellow-400">Autenticando...</p>`;
+                        if (initialAuthToken) { await signInWithCustomToken(auth, initialAuthToken); } 
+                        else { await signInAnonymously(auth); }
+                    }
+                });
+                setupBrandFilters();
+                renderBranchFilters('Todas');
+                setupMonthFilter();
+            } catch (error) {
+                console.error("Error al inicializar Firebase:", error);
+                document.getElementById('auth-status').innerHTML = `<p class="text-sm text-red-500">Error de Conexión</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
+
