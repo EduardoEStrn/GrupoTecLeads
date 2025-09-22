@@ -258,16 +258,33 @@
             }
 
             function processData(data) {
-                allLeads = data.map(row => ({
-                    fecha_alta: row["Fecha de Alta"] ? row["Fecha de Alta"].replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') : null,
-                    agencia: row["Agencia"],
-                    nombre: row["Nombre"],
-                    marca: row["SubCampa?帶"] || row["SubCampaña"] || 'Honda',
-                    producto: row["Producto"],
-                    fuente: row["Fuente"],
-                    origen: row["Origen"],
-                    estatus: row["Estatus"]
-                }));
+                allLeads = data.map(row => {
+                    let originalAgencia = row["Agencia"] || '';
+                    let standardizedAgencia = originalAgencia;
+                    let lowerAgencia = originalAgencia.toLowerCase();
+
+                    if (lowerAgencia.includes('tecnologico') || lowerAgencia.includes('tecnológico')) {
+                        standardizedAgencia = 'Tecnológico';
+                    } else if (lowerAgencia.includes('semi nuevo') || lowerAgencia.includes('seminuevo')) {
+                        standardizedAgencia = 'Semi Nuevo';
+                    } else if (lowerAgencia.includes('valle oriente')) {
+                        standardizedAgencia = 'Valle Oriente';
+                    } else if (lowerAgencia.includes('poniente')) {
+                        standardizedAgencia = 'Poniente';
+                    }
+                    // Agrega aquí más reglas si encuentras otras variaciones
+
+                    return {
+                        fecha_alta: row["Fecha de Alta"] ? row["Fecha de Alta"].replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') : null,
+                        agencia: standardizedAgencia,
+                        nombre: row["Nombre"],
+                        marca: row["SubCampa?帶"] || row["SubCampaña"] || 'Honda',
+                        producto: row["Producto"],
+                        fuente: row["Fuente"],
+                        origen: row["Origen"],
+                        estatus: row["Estatus"]
+                    };
+                });
 
                 setupBrandFilters();
                 renderBranchFilters('Todas');
@@ -280,4 +297,5 @@
     </script>
 </body>
 </html>
+
 
