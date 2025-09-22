@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Leads</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Papaparse for CSV parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .list-container { height: 320px; }
+        .bar-chart-container { position: relative; height: 400px; width: 100%;}
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Encabezado -->
+        <header class="mb-8 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-teal-400">Dashboard de Leads</h1>
+                <p class="text-gray-400 mt-1">Análisis de la adquisición y estado de los leads.</p>
+            </div>
+             <div id="status-message" class="text-right">
+                 <p class="text-sm text-gray-400">Esperando archivo CSV...</p>
+            </div>
+        </header>
+
+        <!-- Uploader Section -->
+        <div id="uploader-container" class="text-center py-20 px-6 bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-600">
+            <h2 class="text-2xl font-bold text-white mb-4">Carga tu archivo CSV para empezar</h2>
+            <p class="text-gray-400 mb-6">Selecciona el archivo de leads para visualizar los datos en el dashboard.</p>
+            <label for="csv-uploader" class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 inline-block">
+                Seleccionar Archivo
+            </label>
+            <input type="file" id="csv-uploader" class="hidden" accept=".csv">
+        </div>
+
+        <!-- Dashboard Content (initially hidden) -->
+        <div id="dashboard-content" class="hidden">
+            <!-- Contenedor de Filtros -->
+            <div class="bg-gray-800/50 rounded-2xl p-4 mb-8">
+                <!-- Filtros por Marca -->
+                <div class="mb-6 flex flex-wrap items-center justify-start gap-4">
+                    <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Marca:</span>
+                    <button data-brand="Todas" class="brand-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105">
+                        <span>Todas</span>
+                    </button>
+                    <button data-brand="BYD" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                         <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=BYD" alt="BYD" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                        <span>BYD</span>
+                    </button>
+                    <button data-brand="Honda" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                         <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=H" alt="Honda" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                        <span>Honda</span>
+                    </button>
+                    <button data-brand="Denza" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
+                         <img src="https://placehold.co/48x48/4b5563/FFFFFF?text=DZ" alt="Denza" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                        <span>Denza</span>
+                    </button>
+                </div>
+                <!-- Filtros por Sucursal y Mes -->
+                <div class="flex flex-col items-start gap-y-6">
+                    <div class="flex flex-wrap items-center justify-start gap-4 w-full">
+                        <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Sucursal:</span>
+                        <div id="branch-filters-container" class="flex flex-wrap items-center justify-center sm:justify-start gap-4"></div>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-start gap-4">
+                         <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Mes:</span>
+                        <select id="month-filter" class="bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500"></select>
+                    </div>
+                </div>
+            </div>
+            <main>
+                <!-- KPIs -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-lg font-semibold text-gray-300">Total de Leads</h2><p id="totalLeads" class="text-5xl font-bold text-white mt-2">0</p></div>
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-lg font-semibold text-gray-300">Leads de Hoy</h2><p id="leadsHoy" class="text-5xl font-bold text-white mt-2">0</p></div>
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-lg font-semibold text-gray-300">Leads Contactados</h2><p id="leadsContactados" class="text-5xl font-bold text-white mt-2">0</p></div>
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-lg font-semibold text-gray-300">Leads Sin Contactar</h2><p id="leadsSinContactar" class="text-5xl font-bold text-red-500 mt-2">0</p></div>
+                </div>
+                
+                <!-- Gráfica de Estatus y Lista de Leads -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-xl font-semibold text-gray-300 mb-4">Leads por Estatus</h2><div class="chart-container"><canvas id="leadsPorEstatusChart"></canvas></div></div>
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col"><h2 class="text-xl font-semibold text-gray-300 mb-4">Últimos Leads Registrados</h2><div id="ultimosLeads" class="flex-grow overflow-y-auto custom-scrollbar pr-2 list-container"><p class="text-gray-500">Cargando leads...</p></div></div>
+                </div>
+
+                <!-- Gráfica de Origen (Barras) -->
+                <div class="grid grid-cols-1 gap-6">
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg">
+                        <h2 class="text-xl font-semibold text-gray-300 mb-4">Leads por Origen</h2>
+                        <div class="bar-chart-container">
+                            <canvas id="leadsPorFuenteChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- Definiciones y Variables Globales ---
+        let allLeads = [];
+        let activeBranch = 'Todas';
+        let activeBrand = 'Todas';
+        let activeMonth = 'Todos';
+        let leadsPorFuenteChart, leadsPorEstatusChart;
+
+        const defaultBranches = ["Valle Oriente", "Semi Nuevo", "Poniente", "Tecnológico"];
+        const bydBranches = ["Cumbres", "Gonzalitos", "Sendero", "Santa Catarina", "Piedras Negras"];
+        const denzaBranches = ["Calzada"];
+        const branchDisplayNames = { "Valle Oriente": "Valle O.", "Semi Nuevo": "Semi Nuevo", "Poniente": "Poniente", "Tecnológico": "Tecnológico", "Cumbres": "Cumbres", "Gonzalitos": "Gonzalitos", "Sendero": "Sendero", "Santa Catarina": "Sta. Catarina", "Piedras Negras": "P. Negras", "Calzada": "Calzada" };
+        
+        function applyFiltersAndRender() {
+            let filteredLeads = allLeads;
+            if (activeBrand !== 'Todas') filteredLeads = filteredLeads.filter(lead => lead.marca === activeBrand);
+            if (activeBranch !== 'Todas') filteredLeads = filteredLeads.filter(lead => lead.agencia === activeBranch);
+            if (activeMonth !== 'Todos') {
+                const [year, monthIndex] = activeMonth.split('-');
+                filteredLeads = filteredLeads.filter(lead => {
+                    if (!lead.fecha_alta) return false;
+                    const date = new Date(lead.fecha_alta);
+                    return date.getFullYear() == year && date.getMonth() == monthIndex;
+                });
+            }
+            renderDashboard(filteredLeads);
+        }
+
+        function renderDashboard(leads) {
+            // KPIs
+            document.getElementById('totalLeads').textContent = leads.length;
+            const hoyStr = new Date().toISOString().slice(0, 10);
+            document.getElementById('leadsHoy').textContent = leads.filter(l => l.fecha_alta && l.fecha_alta.startsWith(hoyStr)).length;
+            const contactados = leads.filter(l => l.estatus && (l.estatus.toLowerCase().includes('contactado') || l.estatus.toLowerCase().includes('finalizado'))).length;
+            document.getElementById('leadsContactados').textContent = contactados;
+            document.getElementById('leadsSinContactar').textContent = leads.filter(l => l.estatus && (l.estatus.toLowerCase().includes('no contactado') || l.estatus.toLowerCase().includes('asignado'))).length;
+            
+            // Últimos leads
+            const ultimosLeadsContainer = document.getElementById('ultimosLeads');
+            let html = '<div class="space-y-4">';
+            leads.sort((a, b) => new Date(b.fecha_alta) - new Date(a.fecha_alta)).slice(0, 20).forEach(lead => {
+                const fecha = new Date(lead.fecha_alta);
+                html += `<div class="p-3 bg-gray-700/50 rounded-lg border-l-4 border-teal-500"><p class="font-semibold text-white">${lead.nombre || 'Sin Nombre'}</p><p class="text-sm text-gray-300">${lead.agencia || 'N/A'} - ${lead.marca || 'N/A'}</p><p class="text-xs text-gray-400 mt-1">${fecha.toLocaleString('es-MX')}</p></div>`;
+            });
+            ultimosLeadsContainer.innerHTML = html + '</div>';
+
+            // Gráficas
+            const origenCount = leads.reduce((acc, lead) => {
+                let origenOriginal = lead.origen || 'Desconocido';
+                let origenLowerCase = origenOriginal.toLowerCase();
+                let categoriaFinal = origenOriginal;
+
+                if (origenLowerCase.includes('facebook')) {
+                    categoriaFinal = 'Facebook';
+                } else if (origenLowerCase.includes('instagram')) {
+                    categoriaFinal = 'Instagram';
+                } else if (origenLowerCase.includes('whatsapp')) {
+                    categoriaFinal = 'WhatsApp';
+                } else if (origenLowerCase.includes('tiktok')) {
+                    categoriaFinal = 'TikTok';
+                } else if (origenLowerCase.includes('bikyu')) {
+                    categoriaFinal = 'BikyU';
+                } else if (origenLowerCase.includes('website') || origenLowerCase.includes('pagina')) {
+                    categoriaFinal = 'Página Web';
+                } else if (origenLowerCase.includes('google')) {
+                    categoriaFinal = 'Google';
+                }
+                
+                acc[categoriaFinal] = (acc[categoriaFinal] || 0) + 1;
+                return acc;
+            }, {});
+            const ctxFuente = document.getElementById('leadsPorFuenteChart').getContext('2d');
+            if (leadsPorFuenteChart) leadsPorFuenteChart.destroy();
+            leadsPorFuenteChart = new Chart(ctxFuente, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(origenCount),
+                    datasets: [{
+                        label: 'Número de Leads',
+                        data: Object.values(origenCount),
+                        backgroundColor: '#38bdf8',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { precision: 0 } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            const estatusCount = leads.reduce((acc, lead) => { 
+                let s = (lead.estatus || '').toLowerCase(), cat; 
+                if (s.includes('finalizado') || s.includes('venta')) {
+                    cat = 'Ventas';
+                } else if (s.includes('contactado')) {
+                    cat = 'Contactado';
+                } else if (s.includes('asignado')) {
+                    cat = 'Asignado';
+                } else {
+                    cat = 'No Contactado';
+                }
+                acc[cat] = (acc[cat] || 0) + 1; 
+                return acc; 
+            }, {});
+            const ctxEstatus = document.getElementById('leadsPorEstatusChart').getContext('2d');
+            if (leadsPorEstatusChart) leadsPorEstatusChart.destroy();
+            leadsPorEstatusChart = new Chart(ctxEstatus, { type: 'doughnut', data: { labels: Object.keys(estatusCount), datasets: [{ data: Object.values(estatusCount), backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#6b7280'], borderColor: '#1f2937', borderWidth: 4, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, color: '#9ca3af' } } } } });
+        }
+        
+        function setupBranchFilters() { const b = document.querySelectorAll('.branch-filter-btn'); b.forEach(c => c.addEventListener('click', () => { activeBranch = c.dataset.branch; b.forEach(d => d.classList.replace('bg-teal-500', 'bg-gray-700') || d.classList.replace('text-white', 'text-gray-300')); c.classList.replace('bg-gray-700', 'bg-teal-500'); c.classList.replace('text-gray-300', 'text-white'); applyFiltersAndRender(); })); }
+        function renderBranchFilters(a) { const b = document.getElementById('branch-filters-container'); b.innerHTML = ''; let c; if (a === 'BYD') c = bydBranches; else if (a === 'Denza') c = denzaBranches; else c = defaultBranches; if (a !== 'Denza') b.insertAdjacentHTML('beforeend', `<button data-branch="Todas" class="branch-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105"><span>Todas</span></button>`); c.forEach(d => { const e = branchDisplayNames[d] || d, f = d.substring(0, 2).toUpperCase(), g = a === 'Denza' ? 'bg-teal-500 text-white' : 'bg-gray-700 text-gray-300'; b.insertAdjacentHTML('beforeend', `<button data-branch="${d}" class="branch-filter-btn ${g} p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105"><img src="https://placehold.co/48x48/4b5563/FFFFFF?text=${f}" alt="${d}" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none"><span>${e}</span></button>`); }); setupBranchFilters(); }
+        function setupBrandFilters() { const b = document.querySelectorAll('.brand-filter-btn'); b.forEach(c => c.addEventListener('click', () => { activeBrand = c.dataset.brand; b.forEach(d => d.classList.replace('bg-teal-500', 'bg-gray-700') || d.classList.replace('text-white', 'text-gray-300')); c.classList.replace('bg-gray-700', 'bg-teal-500'); c.classList.replace('text-gray-300', 'text-white'); renderBranchFilters(activeBrand); activeBranch = activeBrand === 'Denza' ? 'Calzada' : 'Todas'; applyFiltersAndRender(); })); }
+        function populateMonthFilter(a) { const b = document.getElementById('month-filter'); if (!b) return; const c = [...new Set(a.filter(lead => lead.fecha_alta).map(d => { const e = new Date(d.fecha_alta); return `${e.getFullYear()}-${String(e.getMonth()).padStart(2, '0')}`; }))].sort((d, e) => e.localeCompare(d)); const d = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]; b.innerHTML = '<option value="Todos">Todos los Meses</option>'; c.forEach(e => { const [f, g] = e.split('-'); const h = document.createElement('option'); h.value = e; h.textContent = `${d[parseInt(g)]} ${f}`; b.appendChild(h); }); }
+        function setupMonthFilter() { const a = document.getElementById('month-filter'); a.addEventListener('change', b => { activeMonth = b.target.value; applyFiltersAndRender(); }); }
+
+        // --- Inicialización ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploaderInput = document.getElementById('csv-uploader');
+            const uploaderContainer = document.getElementById('uploader-container');
+            const dashboardContent = document.getElementById('dashboard-content');
+            const statusMessage = document.getElementById('status-message');
+
+            uploaderInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                statusMessage.innerHTML = `<p class="text-sm text-yellow-400">Procesando archivo...</p>`;
+
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        uploaderContainer.classList.add('hidden');
+                        dashboardContent.classList.remove('hidden');
+                        processData(results.data);
+                    },
+                    error: (error) => {
+                        console.error("Error al parsear el CSV:", error);
+                        statusMessage.innerHTML = `<p class="text-sm text-red-500">Error al leer el archivo.</p>`;
+                        alert(`Error al leer el archivo: ${error.message}`);
+                    }
+                });
+            });
+
+            function processData(data) {
+                allLeads = data.map(row => ({
+                    fecha_alta: row["Fecha de Alta"] ? row["Fecha de Alta"].replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') : null,
+                    agencia: row["Agencia"],
+                    nombre: row["Nombre"],
+                    marca: row["SubCampa?帶"] || row["SubCampaña"] || 'Honda',
+                    producto: row["Producto"],
+                    fuente: row["Fuente"],
+                    origen: row["Origen"],
+                    estatus: row["Estatus"]
+                }));
+
+                setupBrandFilters();
+                renderBranchFilters('Todas');
+                populateMonthFilter(allLeads);
+                setupMonthFilter();
+                applyFiltersAndRender();
+                statusMessage.innerHTML = `<p class="text-sm text-green-400">Datos cargados correctamente.</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
