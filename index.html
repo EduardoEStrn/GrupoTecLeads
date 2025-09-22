@@ -35,22 +35,12 @@
                 <p class="text-gray-400 mt-1">Análisis de la adquisición y estado de los leads.</p>
             </div>
              <div id="status-message" class="text-right">
-                 <p class="text-sm text-gray-400">Esperando archivo CSV...</p>
+                 <p class="text-sm text-yellow-400">Cargando datos...</p>
             </div>
         </header>
 
-        <!-- Uploader Section -->
-        <div id="uploader-container" class="text-center py-20 px-6 bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-600">
-            <h2 class="text-2xl font-bold text-white mb-4">Carga tu archivo CSV para empezar</h2>
-            <p class="text-gray-400 mb-6">Selecciona el archivo de leads para visualizar los datos en el dashboard.</p>
-            <label for="csv-uploader" class="cursor-pointer bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300 inline-block">
-                Seleccionar Archivo
-            </label>
-            <input type="file" id="csv-uploader" class="hidden" accept=".csv">
-        </div>
-
-        <!-- Dashboard Content (initially hidden) -->
-        <div id="dashboard-content" class="hidden">
+        <!-- Dashboard Content -->
+        <div id="dashboard-content">
             <!-- Contenedor de Filtros -->
             <div class="bg-gray-800/50 rounded-2xl p-4 mb-8">
                 <!-- Filtros por Marca -->
@@ -119,6 +109,10 @@
         let activeBrand = 'Todas';
         let activeMonth = 'Todos';
         let leadsPorFuenteChart, leadsPorEstatusChart;
+
+        // --- NOMBRE DE TU ARCHIVO CSV ---
+        // Se ha añadido "./" para asegurar que el navegador lo interprete como una ruta relativa.
+        const CSV_FILE_NAME = './Copia de ENERO A SEPTIEMBRE TOTAL HONDA.csv';
 
         const defaultBranches = ["Valle Oriente", "Semi Nuevo", "Poniente", "Tecnológico"];
         const bydBranches = ["Cumbres", "Gonzalitos", "Sendero", "Santa Catarina", "Piedras Negras"];
@@ -236,33 +230,32 @@
         function setupMonthFilter() { const a = document.getElementById('month-filter'); a.addEventListener('change', b => { activeMonth = b.target.value; applyFiltersAndRender(); }); }
 
         // --- Inicialización ---
-        document.addEventListener('DOMContentLoaded', () => {
-            const uploaderInput = document.getElementById('csv-uploader');
-            const uploaderContainer = document.getElementById('uploader-container');
-            const dashboardContent = document.getElementById('dashboard-content');
+        document.addEventListener('DOMContentLoaded', async () => {
             const statusMessage = document.getElementById('status-message');
-
-            uploaderInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                statusMessage.innerHTML = `<p class="text-sm text-yellow-400">Procesando archivo...</p>`;
-
-                Papa.parse(file, {
+            
+            try {
+                const response = await fetch(CSV_FILE_NAME);
+                if (!response.ok) {
+                    throw new Error(`No se pudo cargar el archivo CSV. Estatus: ${response.status}`);
+                }
+                const csvText = await response.text();
+                
+                Papa.parse(csvText, {
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        uploaderContainer.classList.add('hidden');
-                        dashboardContent.classList.remove('hidden');
                         processData(results.data);
                     },
                     error: (error) => {
-                        console.error("Error al parsear el CSV:", error);
-                        statusMessage.innerHTML = `<p class="text-sm text-red-500">Error al leer el archivo.</p>`;
-                        alert(`Error al leer el archivo: ${error.message}`);
+                         throw new Error(`Error al parsear el CSV: ${error.message}`);
                     }
                 });
-            });
+
+            } catch (error) {
+                console.error("Error al cargar datos:", error);
+                statusMessage.innerHTML = `<p class="text-sm text-red-500">Error: No se encontró el archivo CSV en el repositorio.</p>`;
+                alert('Error: No se pudo cargar el archivo "' + CSV_FILE_NAME + '". Asegúrate de que el archivo CSV esté en el mismo repositorio de GitHub y que el nombre coincida exactamente.');
+            }
 
             function processData(data) {
                 allLeads = data.map(row => ({
@@ -287,6 +280,4 @@
     </script>
 </body>
 </html>
-
-
 
