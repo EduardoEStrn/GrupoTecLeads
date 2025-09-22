@@ -12,8 +12,30 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Papaparse for CSV parsing -->
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyA-SH-pYJfFykVwaU4ZySOdQHOc2epfDuk",
+            authDomain: "dashboard-de-leads.firebaseapp.com",
+            projectId: "dashboard-de-leads",
+            storageBucket: "dashboard-de-leads.firebasestorage.app",
+            messagingSenderId: "193764998975",
+            appId: "1:193764998975:web:b646abe8279e219f791d8a",
+            measurementId: "G-TBR6X2E0MJ"
+        };
+
+
+        // Inicializa Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Llama a la función principal que escucha los datos
+        listenForLeads();
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
@@ -23,6 +45,7 @@
         .chart-container { position: relative; height: 320px; width: 100%; }
         .list-container { height: 320px; }
         .bar-chart-container { position: relative; height: 400px; width: 100%;}
+        .modal { transition: opacity 0.25s ease; }
     </style>
 </head>
 <body class="bg-gray-900 text-white p-4 sm:p-6 md:p-8">
@@ -35,34 +58,32 @@
                 <p class="text-gray-400 mt-1">Análisis de la adquisición y estado de los leads.</p>
             </div>
              <div id="status-message" class="text-right">
-                 <p class="text-sm text-yellow-400">Cargando datos...</p>
+                 <p class="text-sm text-yellow-400">Conectando a la base de datos...</p>
             </div>
         </header>
 
         <!-- Dashboard Content -->
         <div id="dashboard-content">
-            <!-- Contenedor de Filtros -->
+            <!-- Contenedor de Filtros (igual que antes) -->
             <div class="bg-gray-800/50 rounded-2xl p-4 mb-8">
-                <!-- Filtros por Marca -->
-                <div class="mb-6 flex flex-wrap items-center justify-start gap-4">
+                 <div class="mb-6 flex flex-wrap items-center justify-start gap-4">
                     <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Marca:</span>
                     <button data-brand="Todas" class="brand-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105">
                         <span>Todas</span>
                     </button>
                     <button data-brand="BYD" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
-                         <img src="./images/byd.png" alt="BYD" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                         <img src="./images/byd.png" alt="BYD" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='https://placehold.co/48x48/4b5563/FFFFFF?text=BYD';">
                         <span>BYD</span>
                     </button>
                     <button data-brand="Honda" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
-                         <img src="./images/honda.png" alt="Honda" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                         <img src="./images/honda.png" alt="Honda" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='https://placehold.co/48x48/4b5563/FFFFFF?text=H';">
                         <span>Honda</span>
                     </button>
                     <button data-brand="Denza" class="brand-filter-btn bg-gray-700 text-gray-300 p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105">
-                         <img src="./images/denza.png" alt="Denza" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none">
+                         <img src="./images/denza.png" alt="Denza" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='https://placehold.co/48x48/4b5563/FFFFFF?text=DZ';">
                         <span>Denza</span>
                     </button>
                 </div>
-                <!-- Filtros por Sucursal y Mes -->
                 <div class="flex flex-col items-start gap-y-6">
                     <div class="flex flex-wrap items-center justify-start gap-4 w-full">
                         <span class="text-gray-400 font-semibold mr-2 w-full sm:w-auto text-center sm:text-left">Sucursal:</span>
@@ -86,7 +107,13 @@
                 <!-- Gráfica de Estatus y Lista de Leads -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div class="bg-gray-800 p-6 rounded-2xl shadow-lg"><h2 class="text-xl font-semibold text-gray-300 mb-4">Leads por Estatus</h2><div class="chart-container"><canvas id="leadsPorEstatusChart"></canvas></div></div>
-                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col"><h2 class="text-xl font-semibold text-gray-300 mb-4">Últimos Leads Registrados</h2><div id="ultimosLeads" class="flex-grow overflow-y-auto custom-scrollbar pr-2 list-container"><p class="text-gray-500">Cargando leads...</p></div></div>
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-300">Últimos Leads Registrados</h2>
+                            <button id="add-lead-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-1 px-3 rounded-lg text-sm transition-colors duration-200 shadow">Añadir</button>
+                        </div>
+                        <div id="ultimosLeads" class="flex-grow overflow-y-auto custom-scrollbar pr-2 list-container"><p class="text-gray-500">Esperando datos...</p></div>
+                    </div>
                 </div>
 
                 <!-- Gráfica de Origen (Barras) -->
@@ -102,23 +129,115 @@
         </div>
     </div>
 
-    <script>
-        // --- Definiciones y Variables Globales ---
+    <!-- Modal para Añadir Lead (igual que antes) -->
+    <div id="add-lead-modal" class="modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-lg transform transition-all -translate-y-10 opacity-0" id="modal-content">
+            <h2 class="text-2xl font-bold text-teal-400 mb-6">Añadir Nuevo Lead</h2>
+            <form id="add-lead-form">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="lead-nombre" class="block text-sm font-medium text-gray-300 mb-1">Nombre Completo</label>
+                        <input type="text" id="lead-nombre" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label for="lead-marca" class="block text-sm font-medium text-gray-300 mb-1">Marca</label>
+                        <select id="lead-marca" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option>Honda</option>
+                            <option>BYD</option>
+                            <option>Denza</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="lead-agencia" class="block text-sm font-medium text-gray-300 mb-1">Agencia</label>
+                        <select id="lead-agencia" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option>Valle Oriente</option>
+                            <option>Semi Nuevo</option>
+                            <option>Poniente</option>
+                            <option>Tecnológico</option>
+                            <option>Cumbres</option>
+                            <option>Gonzalitos</option>
+                            <option>Sendero</option>
+                            <option>Santa Catarina</option>
+                            <option>Piedras Negras</option>
+                            <option>Calzada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="lead-origen" class="block text-sm font-medium text-gray-300 mb-1">Origen</label>
+                         <input type="text" id="lead-origen" required class="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-teal-500" value="Manual">
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end gap-4">
+                    <button type="button" id="cancel-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">Cancelar</button>
+                    <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">Guardar Lead</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // Importa las funciones que necesitamos de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
+        // Este es un ejemplo, debes reemplazarlo con el tuyo.
+        const firebaseConfig = {
+            apiKey: "AIzaSy...xxxxxxxxxxxxxxxxxxx",
+            authDomain: "tu-proyecto.firebaseapp.com",
+            projectId: "tu-proyecto",
+            storageBucket: "tu-proyecto.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:xxxxxxxxxxxxxx"
+        };
+        
+        // --- INICIALIZACIÓN DE FIREBASE ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const leadsCollection = collection(db, 'leads');
+
+        // --- Variables Globales ---
         let allLeads = [];
         let activeBranch = 'Todas';
         let activeBrand = 'Todas';
         let activeMonth = 'Todos';
         let leadsPorFuenteChart, leadsPorEstatusChart;
 
-        // --- NOMBRE DE TU ARCHIVO CSV ---
-        // Se ha añadido "./" para asegurar que el navegador lo interprete como una ruta relativa.
-        const CSV_FILE_NAME = './Copia de ENERO A SEPTIEMBRE TOTAL HONDA.csv';
-
         const defaultBranches = ["Valle Oriente", "Semi Nuevo", "Poniente", "Tecnológico"];
         const bydBranches = ["Cumbres", "Gonzalitos", "Sendero", "Santa Catarina", "Piedras Negras"];
         const denzaBranches = ["Calzada"];
         const branchDisplayNames = { "Valle Oriente": "Valle O.", "Semi Nuevo": "Semi Nuevo", "Poniente": "Poniente", "Tecnológico": "Tecnológico", "Cumbres": "Cumbres", "Gonzalitos": "Gonzalitos", "Sendero": "Sendero", "Santa Catarina": "Sta. Catarina", "Piedras Negras": "P. Negras", "Calzada": "Calzada" };
         
+        // --- FUNCIÓN PRINCIPAL: ESCUCHA DE DATOS EN TIEMPO REAL ---
+        function listenForLeads() {
+            const statusMessage = document.getElementById('status-message');
+            onSnapshot(leadsCollection, (snapshot) => {
+                allLeads = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    // Convertir Timestamps de Firebase a objetos Date de JS
+                    const fechaAltaJS = data.fecha_alta && data.fecha_alta.toDate ? data.fecha_alta.toDate() : null;
+                    return {
+                        id: doc.id,
+                        ...data,
+                        fecha_alta: fechaAltaJS ? fechaAltaJS.toISOString() : null, // Convertir a formato ISO para consistencia
+                    };
+                });
+                
+                statusMessage.innerHTML = `<p class="text-sm text-green-400">Datos cargados (${allLeads.length} leads)</p>`;
+                
+                // Inicializa los filtros y renderiza el dashboard por primera vez
+                if (document.getElementById('month-filter').options.length <= 1) {
+                     populateMonthFilter(allLeads);
+                }
+                applyFiltersAndRender();
+            }, (error) => {
+                console.error("Error al obtener datos de Firestore: ", error);
+                statusMessage.innerHTML = `<p class="text-sm text-red-500">Error: Revisa la configuración de Firebase.</p>`;
+                alert("Error de conexión con la base de datos. Asegúrate de haber pegado tu configuración de Firebase y que el Project ID sea correcto.");
+            });
+        }
+
+        // --- LÓGICA DE RENDERIZADO (la mayoría es igual que antes) ---
         function applyFiltersAndRender() {
             let filteredLeads = allLeads;
             if (activeBrand !== 'Todas') filteredLeads = filteredLeads.filter(lead => lead.marca === activeBrand);
@@ -135,15 +254,12 @@
         }
 
         function renderDashboard(leads) {
-            // KPIs
             document.getElementById('totalLeads').textContent = leads.length;
             const hoyStr = new Date().toISOString().slice(0, 10);
             document.getElementById('leadsHoy').textContent = leads.filter(l => l.fecha_alta && l.fecha_alta.startsWith(hoyStr)).length;
             const contactados = leads.filter(l => l.estatus && (l.estatus.toLowerCase().includes('contactado') || l.estatus.toLowerCase().includes('finalizado'))).length;
             document.getElementById('leadsContactados').textContent = contactados;
             document.getElementById('leadsSinContactar').textContent = leads.filter(l => l.estatus && (l.estatus.toLowerCase().includes('no contactado') || l.estatus.toLowerCase().includes('asignado'))).length;
-            
-            // Últimos leads
             const ultimosLeadsContainer = document.getElementById('ultimosLeads');
             let html = '<div class="space-y-4">';
             leads.sort((a, b) => new Date(b.fecha_alta) - new Date(a.fecha_alta)).slice(0, 20).forEach(lead => {
@@ -151,149 +267,72 @@
                 html += `<div class="p-3 bg-gray-700/50 rounded-lg border-l-4 border-teal-500"><p class="font-semibold text-white">${lead.nombre || 'Sin Nombre'}</p><p class="text-sm text-gray-300">${lead.agencia || 'N/A'} - ${lead.marca || 'N/A'}</p><p class="text-xs text-gray-400 mt-1">${fecha.toLocaleString('es-MX')}</p></div>`;
             });
             ultimosLeadsContainer.innerHTML = html + '</div>';
-
-            // Gráficas
             const origenCount = leads.reduce((acc, lead) => {
                 let origenOriginal = lead.origen || 'Desconocido';
                 let origenLowerCase = origenOriginal.toLowerCase();
                 let categoriaFinal = origenOriginal;
-
-                if (origenLowerCase.includes('facebook')) {
-                    categoriaFinal = 'Facebook';
-                } else if (origenLowerCase.includes('instagram')) {
-                    categoriaFinal = 'Instagram';
-                } else if (origenLowerCase.includes('whatsapp')) {
-                    categoriaFinal = 'WhatsApp';
-                } else if (origenLowerCase.includes('tiktok')) {
-                    categoriaFinal = 'TikTok';
-                } else if (origenLowerCase.includes('bikyu')) {
-                    categoriaFinal = 'BikyU';
-                } else if (origenLowerCase.includes('website') || origenLowerCase.includes('pagina')) {
-                    categoriaFinal = 'Página Web';
-                } else if (origenLowerCase.includes('google')) {
-                    categoriaFinal = 'Google';
-                }
-                
+                if (origenLowerCase.includes('facebook')) { categoriaFinal = 'Facebook'; } else if (origenLowerCase.includes('instagram')) { categoriaFinal = 'Instagram'; } else if (origenLowerCase.includes('whatsapp')) { categoriaFinal = 'WhatsApp'; } else if (origenLowerCase.includes('tiktok')) { categoriaFinal = 'TikTok'; } else if (origenLowerCase.includes('bikyu')) { categoriaFinal = 'BikyU'; } else if (origenLowerCase.includes('website') || origenLowerCase.includes('pagina')) { categoriaFinal = 'Página Web'; } else if (origenLowerCase.includes('google')) { categoriaFinal = 'Google'; }
                 acc[categoriaFinal] = (acc[categoriaFinal] || 0) + 1;
                 return acc;
             }, {});
             const ctxFuente = document.getElementById('leadsPorFuenteChart').getContext('2d');
             if (leadsPorFuenteChart) leadsPorFuenteChart.destroy();
-            leadsPorFuenteChart = new Chart(ctxFuente, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(origenCount),
-                    datasets: [{
-                        label: 'Número de Leads',
-                        data: Object.values(origenCount),
-                        backgroundColor: '#38bdf8',
-                        borderRadius: 6,
-                        borderSkipped: false,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { precision: 0 } },
-                        x: { grid: { display: false } }
-                    },
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
-
-            const estatusCount = leads.reduce((acc, lead) => { 
-                let s = (lead.estatus || '').toLowerCase(), cat; 
-                if (s.includes('finalizado') || s.includes('venta')) {
-                    cat = 'Ventas';
-                } else if (s.includes('contactado')) {
-                    cat = 'Contactado';
-                } else if (s.includes('asignado')) {
-                    cat = 'Asignado';
-                } else {
-                    cat = 'No Contactado';
-                }
-                acc[cat] = (acc[cat] || 0) + 1; 
-                return acc; 
-            }, {});
+            leadsPorFuenteChart = new Chart(ctxFuente, { type: 'bar', data: { labels: Object.keys(origenCount), datasets: [{ label: 'Número de Leads', data: Object.values(origenCount), backgroundColor: '#38bdf8', borderRadius: 6, borderSkipped: false, }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { precision: 0 } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } } });
+            const estatusCount = leads.reduce((acc, lead) => {  let s = (lead.estatus || '').toLowerCase(), cat; if (s.includes('finalizado') || s.includes('venta')) { cat = 'Ventas'; } else if (s.includes('contactado')) { cat = 'Contactado'; } else if (s.includes('asignado')) { cat = 'Asignado'; } else { cat = 'No Contactado'; } acc[cat] = (acc[cat] || 0) + 1; return acc; }, {});
             const ctxEstatus = document.getElementById('leadsPorEstatusChart').getContext('2d');
             if (leadsPorEstatusChart) leadsPorEstatusChart.destroy();
             leadsPorEstatusChart = new Chart(ctxEstatus, { type: 'doughnut', data: { labels: Object.keys(estatusCount), datasets: [{ data: Object.values(estatusCount), backgroundColor: ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#6b7280'], borderColor: '#1f2937', borderWidth: 4, hoverOffset: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 20, color: '#9ca3af' } } } } });
         }
-        
         function setupBranchFilters() { const b = document.querySelectorAll('.branch-filter-btn'); b.forEach(c => c.addEventListener('click', () => { activeBranch = c.dataset.branch; b.forEach(d => d.classList.replace('bg-teal-500', 'bg-gray-700') || d.classList.replace('text-white', 'text-gray-300')); c.classList.replace('bg-gray-700', 'bg-teal-500'); c.classList.replace('text-gray-300', 'text-white'); applyFiltersAndRender(); })); }
-        function renderBranchFilters(a) { const b = document.getElementById('branch-filters-container'); b.innerHTML = ''; let c; if (a === 'BYD') c = bydBranches; else if (a === 'Denza') c = denzaBranches; else c = defaultBranches; if (a !== 'Denza') b.insertAdjacentHTML('beforeend', `<button data-branch="Todas" class="branch-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105"><span>Todas</span></button>`); c.forEach(d => { const e = branchDisplayNames[d] || d, f = d.substring(0, 2).toUpperCase(), g = a === 'Denza' ? 'bg-teal-500 text-white' : 'bg-gray-700 text-gray-300'; b.insertAdjacentHTML('beforeend', `<button data-branch="${d}" class="branch-filter-btn ${g} p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105"><img src="https://placehold.co/48x48/4b5563/FFFFFF?text=${f}" alt="${d}" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none"><span>${e}</span></button>`); }); setupBranchFilters(); }
+        function renderBranchFilters(a) { const b = document.getElementById('branch-filters-container'); b.innerHTML = ''; let c; if (a === 'BYD') c = bydBranches; else if (a === 'Denza') c = denzaBranches; else c = defaultBranches; if (a !== 'Denza') b.insertAdjacentHTML('beforeend', `<button data-branch="Todas" class="branch-filter-btn bg-teal-500 text-white px-6 py-3 rounded-2xl text-sm font-semibold shadow transition-all duration-200 transform hover:scale-105"><span>Todas</span></button>`); c.forEach(d => { const e = branchDisplayNames[d] || d; const f = d.toLowerCase().replace(/ /g, '-').replace('ó', 'o'); const g = a === 'Denza' ? 'bg-teal-500 text-white' : 'bg-gray-700 text-gray-300'; const imagePath = `./images/${f}.png`; const placeholder = `https://placehold.co/48x48/4b5563/FFFFFF?text=${d.substring(0,2).toUpperCase()}`; b.insertAdjacentHTML('beforeend', `<button data-branch="${d}" class="branch-filter-btn ${g} p-3 rounded-2xl text-sm font-semibold transition-all duration-200 hover:bg-gray-600 flex flex-col items-center w-24 h-24 justify-center transform hover:scale-105"><img src="${imagePath}" alt="${d}" class="w-12 h-12 mb-1 rounded-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='${placeholder}';"><span>${e}</span></button>`); }); setupBranchFilters(); }
         function setupBrandFilters() { const b = document.querySelectorAll('.brand-filter-btn'); b.forEach(c => c.addEventListener('click', () => { activeBrand = c.dataset.brand; b.forEach(d => d.classList.replace('bg-teal-500', 'bg-gray-700') || d.classList.replace('text-white', 'text-gray-300')); c.classList.replace('bg-gray-700', 'bg-teal-500'); c.classList.replace('text-gray-300', 'text-white'); renderBranchFilters(activeBrand); activeBranch = activeBrand === 'Denza' ? 'Calzada' : 'Todas'; applyFiltersAndRender(); })); }
         function populateMonthFilter(a) { const b = document.getElementById('month-filter'); if (!b) return; const c = [...new Set(a.filter(lead => lead.fecha_alta).map(d => { const e = new Date(d.fecha_alta); return `${e.getFullYear()}-${String(e.getMonth()).padStart(2, '0')}`; }))].sort((d, e) => e.localeCompare(d)); const d = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]; b.innerHTML = '<option value="Todos">Todos los Meses</option>'; c.forEach(e => { const [f, g] = e.split('-'); const h = document.createElement('option'); h.value = e; h.textContent = `${d[parseInt(g)]} ${f}`; b.appendChild(h); }); }
         function setupMonthFilter() { const a = document.getElementById('month-filter'); a.addEventListener('change', b => { activeMonth = b.target.value; applyFiltersAndRender(); }); }
-
-        // --- Inicialización ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            const statusMessage = document.getElementById('status-message');
+        
+        // --- LÓGICA DEL MODAL ---
+        const modal = document.getElementById('add-lead-modal');
+        const modalContent = document.getElementById('modal-content');
+        const addLeadBtn = document.getElementById('add-lead-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const addLeadForm = document.getElementById('add-lead-form');
+        function openModal() { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('-translate-y-10', 'opacity-0'); }, 10); }
+        function closeModal() { modal.classList.add('opacity-0'); modalContent.classList.add('-translate-y-10', 'opacity-0'); setTimeout(() => { modal.classList.add('hidden'); addLeadForm.reset(); }, 250); }
+        addLeadBtn.addEventListener('click', openModal);
+        cancelBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        
+        // --- GUARDAR NUEVO LEAD EN FIREBASE ---
+        addLeadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newLead = {
+                nombre: document.getElementById('lead-nombre').value,
+                marca: document.getElementById('lead-marca').value,
+                agencia: document.getElementById('lead-agencia').value,
+                origen: document.getElementById('lead-origen').value,
+                estatus: 'Asignado',
+                fecha_alta: serverTimestamp() // Usa la hora del servidor para consistencia
+            };
             
             try {
-                const response = await fetch(CSV_FILE_NAME);
-                if (!response.ok) {
-                    throw new Error(`No se pudo cargar el archivo CSV. Estatus: ${response.status}`);
-                }
-                const csvText = await response.text();
-                
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        processData(results.data);
-                    },
-                    error: (error) => {
-                         throw new Error(`Error al parsear el CSV: ${error.message}`);
-                    }
-                });
-
+                await addDoc(leadsCollection, newLead);
+                closeModal();
             } catch (error) {
-                console.error("Error al cargar datos:", error);
-                statusMessage.innerHTML = `<p class="text-sm text-red-500">Error: No se encontró el archivo CSV en el repositorio.</p>`;
-                alert('Error: No se pudo cargar el archivo "' + CSV_FILE_NAME + '". Asegúrate de que el archivo CSV esté en el mismo repositorio de GitHub y que el nombre coincida exactamente.');
-            }
-
-            function processData(data) {
-                allLeads = data.map(row => {
-                    let originalAgencia = row["Agencia"] || '';
-                    let standardizedAgencia = originalAgencia;
-                    let lowerAgencia = originalAgencia.toLowerCase();
-
-                    if (lowerAgencia.includes('tecnologico') || lowerAgencia.includes('tecnológico')) {
-                        standardizedAgencia = 'Tecnológico';
-                    } else if (lowerAgencia.includes('semi nuevo') || lowerAgencia.includes('seminuevo')) {
-                        standardizedAgencia = 'Semi Nuevo';
-                    } else if (lowerAgencia.includes('valle oriente')) {
-                        standardizedAgencia = 'Valle Oriente';
-                    } else if (lowerAgencia.includes('poniente')) {
-                        standardizedAgencia = 'Poniente';
-                    }
-                    // Agrega aquí más reglas si encuentras otras variaciones
-
-                    return {
-                        fecha_alta: row["Fecha de Alta"] ? row["Fecha de Alta"].replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') : null,
-                        agencia: standardizedAgencia,
-                        nombre: row["Nombre"],
-                        marca: row["SubCampa?帶"] || row["SubCampaña"] || 'Honda',
-                        producto: row["Producto"],
-                        fuente: row["Fuente"],
-                        origen: row["Origen"],
-                        estatus: row["Estatus"]
-                    };
-                });
-
-                setupBrandFilters();
-                renderBranchFilters('Todas');
-                populateMonthFilter(allLeads);
-                setupMonthFilter();
-                applyFiltersAndRender();
-                statusMessage.innerHTML = `<p class="text-sm text-green-400">Datos cargados correctamente.</p>`;
+                console.error("Error al añadir el lead: ", error);
+                alert("Hubo un error al guardar el lead. Inténtalo de nuevo.");
             }
         });
+
+        // --- INICIALIZACIÓN DEL SCRIPT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // La conexión a Firebase ya se inicia en el primer script
+            // Aquí solo configuramos los elementos interactivos
+            setupBrandFilters();
+            renderBranchFilters('Todas');
+            setupMonthFilter();
+        });
+
+        // Esta función global es necesaria porque el script principal es un módulo
+        window.listenForLeads = listenForLeads;
     </script>
 </body>
 </html>
