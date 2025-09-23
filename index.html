@@ -17,17 +17,15 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // --- PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
+        // --- Configuración de Firebase ---
         const firebaseConfig = {
             apiKey: "AIzaSyA-SH-pYJfFykVwaU4ZySOdQHOc2epfDuk",
             authDomain: "dashboard-de-leads.firebaseapp.com",
             projectId: "dashboard-de-leads",
             storageBucket: "dashboard-de-leads.firebasestorage.app",
             messagingSenderId: "193764998975",
-            appId: "1:193764998975:web:b646abe8279e219f791d8a",
-            measurementId: "G-TBR6X2E0MJ"
+            appId: "1:193764998975:web:b646abe8279e219f791d8a"
         };
-
 
         // Inicializa Firebase
         const app = initializeApp(firebaseConfig);
@@ -180,15 +178,15 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE ---
-        // Este es un ejemplo, debes reemplazarlo con el tuyo.
+        // --- Configuración de Firebase ---
+        // (Esta sección ya está en el <head>, pero la lógica principal va aquí)
         const firebaseConfig = {
-            apiKey: "AIzaSy...xxxxxxxxxxxxxxxxxxx",
-            authDomain: "tu-proyecto.firebaseapp.com",
-            projectId: "tu-proyecto",
-            storageBucket: "tu-proyecto.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:xxxxxxxxxxxxxx"
+            apiKey: "AIzaSyA-SH-pYJfFykVwaU4ZySOdQHOc2epfDuk",
+            authDomain: "dashboard-de-leads.firebaseapp.com",
+            projectId: "dashboard-de-leads",
+            storageBucket: "dashboard-de-leads.firebasestorage.app",
+            messagingSenderId: "193764998975",
+            appId: "1:193764998975:web:b646abe8279e219f791d8a"
         };
         
         // --- INICIALIZACIÓN DE FIREBASE ---
@@ -326,6 +324,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             // La conexión a Firebase ya se inicia en el primer script
             // Aquí solo configuramos los elementos interactivos
+            listenForLeads(); // Mover la llamada aquí para asegurar que el DOM esté listo
             setupBrandFilters();
             renderBranchFilters('Todas');
             setupMonthFilter();
@@ -336,6 +335,4 @@
     </script>
 </body>
 </html>
-
-
 
